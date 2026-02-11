@@ -1,0 +1,224 @@
+Server
+
+Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Any, 50005);
+
+            serverSocket.Bind(serverEndPoint);
+            serverSocket.Listen(5);
+
+            Console.WriteLine("Server pokrenut. Čeka klijenta...");
+
+
+            Socket clientSocket = serverSocket.Accept();
+            Console.WriteLine("Klijent povezan: " + clientSocket.RemoteEndPoint);
+
+            byte[] buffer = new byte[1024];
+
+            while (true)
+            {
+                int bytes = clientSocket.Receive(buffer);
+                string poruka = Encoding.UTF8.GetString(buffer, 0, bytes);
+
+                Console.WriteLine("Klijent: " + poruka);
+
+                if (poruka.ToLower() == "exit")
+                    break;
+
+                Console.Write("Server: ");
+                string odgovor = Console.ReadLine();
+
+                byte[] data = Encoding.UTF8.GetBytes(odgovor);
+
+                clientSocket.Send(data);
+
+                if (odgovor.ToLower() == "exit")
+                    break;
+            }
+
+            clientSocket.Close();
+            serverSocket.Close();
+
+Client
+
+Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            Console.Write("Unesi IP servera: ");
+            string ip = Console.ReadLine();
+
+            IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 50005);
+
+            clientSocket.Connect(serverEndPoint);
+            Console.WriteLine("Povezan na server.");
+
+            byte[] buffer = new byte[1024];
+
+            while (true)
+            {
+                Console.Write("Klijent: ");
+                string poruka = Console.ReadLine();
+                byte[] data = Encoding.UTF8.GetBytes(poruka);
+                clientSocket.Send(data);
+
+                if (poruka.ToLower() == "exit")
+                    break;
+
+                int bytes = clientSocket.Receive(buffer);
+                string odgovor = Encoding.UTF8.GetString(buffer, 0, bytes);
+
+                Console.WriteLine("Server: " + odgovor);
+                if (odgovor.ToLower() == "exit")
+                    break;
+            }
+
+            clientSocket.Close();
+
+
+/////////////////////////////////////
+Server
+
+
+Stopwatch stopwatch = new Stopwatch();
+
+// (3) Socket definition, IPEndPoints and non-blocking mode
+Socket serverSocket1 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+serverSocket1.Bind(new IPEndPoint(IPAddress.Any, 50032));
+serverSocket1.Blocking = false;
+
+Socket serverSocket2 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+serverSocket2.Bind(new IPEndPoint(IPAddress.Loopback, 50034));
+serverSocket2.Blocking = false;
+
+Socket serverSocket3 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+serverSocket3.Bind(new IPEndPoint(IPAddress.Parse("192.168.18.200"), 50036)); // (2) IP address of specific computer in network
+serverSocket3.Blocking = false;
+
+// (4) List of all server sockets, their timeouts and numbers of tries to perform Poll function
+List<Socket> serverSockets = new List<Socket>() { serverSocket1, serverSocket2, serverSocket3 };
+List<int> timeOuts = new List<int>() { 500 * 1000, 1000 * 1000, 1500 * 1000 }; //microseconds
+List<int> noOfTries = new List<int>() { 20, 15, 10 };
+
+// (5) 065 phone numbers counter
+int counter065 = 0;
+// (6) overall message counter
+int messageCounter = 0;
+
+while (true)
+{
+    for(int i = 0; i < 3; i++)
+    {
+        // (3) Polling each socket, according to its timeOut value
+        if(serverSockets[i].Poll(timeOuts[i], SelectMode.SelectRead))
+        {
+            // (3) Event has happenend, so the socket is receiving the object
+            byte[] dataBuffer = new byte[256];
+            Contact contactObject = null;
+            EndPoint clientAddress = new IPEndPoint(IPAddress.None, 0);
+            serverSockets[i].ReceiveFrom(dataBuffer, ref clientAddress);
+            // (4) Deserialization of the received object from bytes to concrete class, and printing out the values associated with the object
+            using (MemoryStream ms = new MemoryStream(dataBuffer))
+            {
+                BinaryFormatter bf = new BinaryFormatter();
+                contactObject = (Contact)bf.Deserialize(ms);
+            }
+            Console.WriteLine($"ServerSocket{i+1} received contact details from {clientAddress}: {contactObject.FirstName} {contactObject.LastName} {contactObject.PhoneNumber}");
+
+            // (6) restarting the stopwatch to measure time
+            stopwatch.Restart();
+            messageCounter++;
+            
+            // (5) if string that represents contact phone number starts with 065, the counter is increased
+            if (contactObject.PhoneNumber.StartsWith("065"))
+            {
+                counter065++;
+            }
+            // (4) number of tries is reset to start waiting again, after the message is received
+            noOfTries[i] = i == 0 ? 20 : i == 1 ? 15 : 10;
+        }
+        else
+        {
+            // (3) decreasing the number of tries and checking if it should be reset again
+            noOfTries[i]--;
+            if(noOfTries[i] == 0)
+            {
+                noOfTries[i] = i == 0 ? 20 : i == 1 ? 15 : 10;
+            }
+            Console.WriteLine($"Timeout for serverSocket{i + 1} exceeded. Tries left: {noOfTries[i]}");
+        }
+    }
+    // (7) checking for conditions to stop Server running
+    if(messageCounter >= 30)
+    {
+        break;
+    }
+    if(stopwatch.Elapsed.TotalSeconds >= 10)
+    {
+        break;
+    }
+}
+
+Console.WriteLine($"Received 065 contact phone numbers: {counter065}");
+Console.ReadKey();
+
+
+
+Client
+
+Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+//Client inputs server details
+Console.WriteLine("Input server IP address:");
+string ipAddress = Console.ReadLine();
+
+Console.WriteLine("Input server port:");
+int port = int.Parse(Console.ReadLine());
+
+while(true)
+{
+    //Class Contact object is created
+    Contact contactObject = new Contact();
+
+    //Input all the values for the object
+    Console.WriteLine("Input contact first name:");
+    contactObject.FirstName = Console.ReadLine();
+    if (contactObject.FirstName.ToLower().Equals("end"))
+    {
+        break;
+    } 
+
+    Console.WriteLine("Input contact last name:");
+    contactObject.LastName = Console.ReadLine();
+    
+    Console.WriteLine("Input contact phone number:");
+    contactObject.PhoneNumber = Console.ReadLine();
+
+    //Converting the object to a byte array
+    byte[] dataBuffer = new byte[256];
+    using (MemoryStream ms = new MemoryStream())
+    {
+        BinaryFormatter bf = new BinaryFormatter();
+        bf.Serialize(ms, contactObject);
+        dataBuffer = ms.ToArray();
+    }
+
+    //Sending the object to the specific server address
+    EndPoint serverAddress = new IPEndPoint(IPAddress.Parse(ipAddress), port);
+    clientSocket.SendTo(dataBuffer, serverAddress);
+}
+
+clientSocket.Close();
+
+
+
+Common
+
+namespace Common
+{
+    [Serializable]
+    public class Contact
+    {
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string PhoneNumber { get; set; }
+    }
+}
