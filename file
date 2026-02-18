@@ -74,7 +74,7 @@ Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, 
             clientSocket.Close();
 
 
-/////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 Server
 
 
@@ -222,3 +222,534 @@ namespace Common
         public string PhoneNumber { get; set; }
     }
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-----> VISNJA NOVO
+
+
+//LOKALNA ADRESA "127.0.0.1"
+//UDP UVEZIVANJE KLIJENTA I SERVERA GA
+//podesiti rad rac na lok mrezi
+// definisati serverske uticnice
+//servsoc1 radi za sve dostupne adrese na portu
+//serversocket2 radi na adresi racunara u lokalnoj mrezi na portu 50154
+//obezbediti reblokirajuci rad svih uticnica na serveru pomocu multiplkesiranje operacija funkcija select
+
+SERVER:
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Collections.Generic;
+
+class Server
+
+class Server
+{
+    static void Main()
+    {
+        // 1. IZ PDF-a: Kreiranje soketa (Dgram/Udp umesto Stream/Tcp)
+        Socket s1 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        Socket s2 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+        // 2. IZ PDF-a: Bind (Povezivanje na adrese i portove)
+        s1.Bind(new IPEndPoint(IPAddress.Any, 50152));
+        s2.Bind(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 50154));
+
+        // 3. IZ PDF-a: Postavljanje u neblokirajući režim
+        s1.Blocking = false;
+        s2.Blocking = false;
+
+        Console.WriteLine("Server sluša na 50152 i 50154...");
+
+//MULTIPLEKSIRANJE
+//4. IZ PDF-a: Multipleksiranje (Lista i Select
+while (true)
+        {
+            // --- IZ PDF-a (Multipleksiranje - Select) ---
+            List<Socket> readSockets = new List<Socket> { s1, s2 };
+
+
+         
+            // Čekamo 1 sekundu (1.000.000 mikrosekundi iz PDF-a)
+            Socket.Select(readSockets, null, null, 1000000);
+
+
+  // 5. IZ PDF-a: Provera rezultata Select metode
+            if (readSockets.Count > 0)
+            {
+                foreach (Socket s in readSockets)
+                {
+                    byte[] buffer = new byte[1024];
+                    EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+
+                    // UDP verzija Receive metode iz PDF-a
+                    // Kod UDP-a koristimo ReceiveFrom (ključno za 5 bodova)
+   // Konverzija teksta (Ista kao u PDF primeru)
+                    int bytesRead = s.ReceiveFrom(buffer, ref remoteEP);
+                   
+                    string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    Console.WriteLine($"Port {((IPEndPoint)s.LocalEndPoint).Port} primio: {message}");
+
+                    // Opciono: Slanje odgovora nazad
+                    byte[] response = Encoding.UTF8.GetBytes("ACK");
+                    s.SendTo(response, remoteEP);
+                }
+            }
+        }
+    }
+}
+
+//UDP KLIJENT
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+class Klijent
+{
+    static void Main()
+    {
+        // Kreiranje UDP utičnice
+// 1. IZ PDF-a: Kreiranje soketa (samo promeniš u Dgram/Udp
+
+        Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+       
+        // Adresa servera (Lokalna IP i port 50152 npr.)
+// 2. IZ PDF-a: Definisanje tačke servera
+        // IPAddress.Parse uzimaš iz primera za klijentsku stranu
+        EndPoint serverEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 50152);
+
+
+//Konverzija poruke (uvek ista iz primera u PDF-u)
+
+        string poruka = "Zdravo, ovo je UDP poruka!";
+        byte[] data = Encoding.UTF8.GetBytes(poruka);
+
+        // Slanje (UDP koristi SendTo) UDP verzija Send operacije
+
+        clientSocket.SendTo(data, serverEP);
+        Console.WriteLine("Poruka poslata.");
+
+        // Prijem potvrde
+//5. Prijem (Ovo je Receive primer iz PDF-a prilagođen za UDP)
+
+        byte[] buffer = new byte[1024];
+        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+        int received = clientSocket.ReceiveFrom(buffer, ref remoteEP);
+
+
+        // 6. Ispis (Kopiraš Encoding.UTF8.GetString iz PDF primera)
+        Console.WriteLine("Server odgovorio: " + Encoding.UTF8.GetString(buffer, 0, received));
+       
+        clientSocket.Close();
+    }
+}
+
+//TCP KONEKCIJA GB
+//inicijalizovari tcp uticnicu na strain servera koja ce sluziti za prijem novih konekcija
+//ip - adresa adresa racun u lok mrezi port 50115 broj knkc 12
+//obezbediti polling model nad sim uticnicama na serveru vreme cekanja po pokusaju 0,9s maksimalno 12 pokusaja bez aktivnosti
+
+//TCP SERVER
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+namespace TcpServer
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            int SERVER_PORT = 50152;
+
+            // 1. Kreiranje TCP utičnice
+            Socket serverSocket = new Socket(
+                AddressFamily.InterNetwork,
+                SocketType.Stream,
+                ProtocolType.Tcp);
+
+            // 2. Povezivanje sa lokalnom adresom i portom
+            IPEndPoint localEndPoint =
+                new IPEndPoint(IPAddress.Any, SERVER_PORT);
+
+            serverSocket.Bind(localEndPoint);
+
+            // 3. Listening režim
+            serverSocket.Listen(10);
+
+            Console.WriteLine("Server pokrenut na portu " + SERVER_PORT);
+            Console.WriteLine("Čeka klijenta...");
+
+            // 4. Prihvatanje konekcije
+            Socket acceptedSocket = serverSocket.Accept();
+
+            Console.WriteLine("Klijent povezan: " +
+                              acceptedSocket.RemoteEndPoint);
+
+            byte[] buffer = new byte[256];
+
+            while (true)
+            {
+                // 5. Prijem poruke
+                int bytesRead = acceptedSocket.Receive(buffer);
+
+                if (bytesRead == 0)
+                    break;
+
+                string message =
+                    Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                Console.WriteLine("Klijent: " + message);
+
+                if (message.ToLower() == "exit")
+                    break;
+
+                // 6. Slanje odgovora
+                Console.Write("Server: ");
+                string odgovor = Console.ReadLine();
+
+                byte[] data =
+                    Encoding.UTF8.GetBytes(odgovor);
+
+                acceptedSocket.Send(data);
+
+                if (odgovor.ToLower() == "exit")
+                    break;
+            }
+
+            acceptedSocket.Close();
+            serverSocket.Close();
+        }
+    }
+}
+
+//KLIJENT TCP
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+namespace TcpServer
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            int SERVER_PORT = 50152;
+
+            // 1. Kreiranje TCP utičnice
+            Socket serverSocket = new Socket(
+                AddressFamily.InterNetwork,
+                SocketType.Stream,
+                ProtocolType.Tcp);
+
+            // 2. Povezivanje sa lokalnom adresom i portom
+            IPEndPoint localEndPoint =
+                new IPEndPoint(IPAddress.Any, SERVER_PORT);
+
+            serverSocket.Bind(localEndPoint);
+
+            // 3. Listening režim
+            serverSocket.Listen(10);
+
+            Console.WriteLine("Server pokrenut na portu " + SERVER_PORT);
+            Console.WriteLine("Čeka klijenta...");
+
+            // 4. Prihvatanje konekcije
+            Socket acceptedSocket = serverSocket.Accept();
+
+            Console.WriteLine("Klijent povezan: " +
+                              acceptedSocket.RemoteEndPoint);
+
+            byte[] buffer = new byte[256];
+
+            while (true)
+            {
+                // 5. Prijem poruke
+                int bytesRead = acceptedSocket.Receive(buffer);
+
+                if (bytesRead == 0)
+                    break;
+
+                string message =
+                    Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                Console.WriteLine("Klijent: " + message);
+
+                if (message.ToLower() == "exit")
+                    break;
+
+                // 6. Slanje odgovora
+                Console.Write("Server: ");
+                string odgovor = Console.ReadLine();
+
+                byte[] data =
+                    Encoding.UTF8.GetBytes(odgovor);
+
+                acceptedSocket.Send(data);
+
+                if (odgovor.ToLower() == "exit")
+                    break;
+            }
+
+            acceptedSocket.Close();
+            serverSocket.Close();
+        }
+    }
+}
+
+
+
+//Implementirati TCP klijent i server aplikacije: ● Inicijalizovati TCP utičnicu na strani servera koja će služiti za prijem novih konekcija:
+// IP: adresa računara
+// Port: 50005
+// Broj konekcija: 15
+// Obezbediti neblokirajući rad svih utičnica na serveru pomoću multipleksiranja operacija.
+
+//KLIJENT
+using System.Net.Sockets;
+using System.Net;
+using System.Text;
+
+Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+// IP adresa servera i port 50005
+clientSocket.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 50005));
+clientSocket.Send(Encoding.UTF8.GetBytes("Zdravo Servere!"));
+
+
+//SERVER
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Collections.Generic;
+using System.Text;
+
+class Server
+{
+    static void Main()
+    {
+        // 1. Inicijalizacija TCP utičnice (Iz tvog PDF-a: Stream, Tcp)
+        Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        // 2. Bind - IP adresa računara i Port 50005
+        // Koristimo IPAddress.Any da bi prihvatao konekcije na mrežnu adresu računara
+        listenSocket.Bind(new IPEndPoint(IPAddress.Any, 50005));
+
+        // 3. Listen - Broj konekcija: 15 (Iz tvog PDF-a: Listen(SOMAXCONN) -> ovde stavljaš 15)
+        listenSocket.Listen(15);
+
+        // 4. Obezbediti neblokirajući rad (Obavezno za Select)
+        listenSocket.Blocking = false;
+
+        // Lista svih aktivnih utičnica (listening + klijenti)
+        List<Socket> sviSoketi = new List<Socket> { listenSocket };
+        List<Socket> spremniZaCitanje = new List<Socket>();
+
+        Console.WriteLine("TCP Server pokrenut na portu 50005...");
+
+        while (true)
+        {
+            // Multipleksiranje: Kopiramo sve sokete u listu koju Select modifikuje
+            spremniZaCitanje.Clear();
+            spremniZaCitanje.AddRange(sviSoketi);
+
+            // Select funkcija (Iz PDF-a: timeout 1s)
+            Socket.Select(spremniZaCitanje, null, null, 1000000);
+
+            foreach (Socket s in spremniZaCitanje)
+            {
+                if (s == listenSocket)
+                {
+                    // Ako je događaj na listenSocket-u, znači da imamo NOVU KONEKCIJU
+                    Socket noviKlijent = listenSocket.Accept();
+                    noviKlijent.Blocking = false; // I klijent mora biti neblokirajući
+                    sviSoketi.Add(noviKlijent);
+                    Console.WriteLine("Novi klijent povezan!");
+                }
+                else
+                {
+                    // Ako je događaj na nekom drugom soketu, znači da KLIJENT ŠALJE PODATKE
+                    byte[] buffer = new byte[1024];
+                    try
+                    {
+                        int primljeno = s.Receive(buffer);
+                        if (primljeno > 0)
+                        {
+                            string poruka = Encoding.UTF8.GetString(buffer, 0, primljeno);
+                            Console.WriteLine("Primljeno: " + poruka);
+
+                            // Odgovor klijentu
+                            s.Send(Encoding.UTF8.GetBytes("Poruka primljena."));
+                        }
+                        else
+                        {
+                            // Klijent se otkačio
+                            s.Close();
+                            sviSoketi.Remove(s);
+                        }
+                    }
+                    catch { /* Greška ili nasilan raskid veze */ }
+                }
+            }
+        }
+    }
+}
+//PRIMWE UDP
+//Rad na adresi računara u lokalnoj mreži
+// Definisati IPEndPoint-e za sve tri utičnice, tako da rade na sledećim adresama:
+//serverSocket1 - IP: sve dostupne adrese, Port: 50032
+//serverSocket2 - IP: 127.0.0.1, Port: 50034
+// serverSocket3 - IP: adresa računara u lokalnoj mreži, Port: 50036
+// Obezbediti polling model nad serverskim utičnicama i sledeća vremena čekanja:
+// serverSocket1 - 0.5 s, 20 pokušaja
+//serverSocket2 - 1 s, 15 pokušaja
+// serverSocket3 - 1.5 s, 10 pokušaja
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Collections.Generic;
+using System.Text;
+
+//SERVER  
+class Server
+{
+    static void Main()
+    {
+        // 1. Pronalaženje stvarne adrese računara u lokalnoj mreži (za serverSocket3)
+        string lokalnaIP = "127.0.0.1"; // Default
+        foreach (var ip in Dns.GetHostEntry(Dns.GetHostName()).AddressList)
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                lokalnaIP = ip.ToString();
+                break;
+            }
+        }
+
+        // 2. Definisanje utičnica (UDP - Dgram) i neblokirajući režim
+        Socket s1 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        Socket s2 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        Socket s3 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+        s1.Blocking = false;
+        s2.Blocking = false;
+        s3.Blocking = false;
+
+        // 3. Bind - IPEndPoint-i prema tvom zadatku
+        s1.Bind(new IPEndPoint(IPAddress.Any, 50032));           // Sve dostupne adrese
+        s2.Bind(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 50034)); // Localhost
+        s3.Bind(new IPEndPoint(IPAddress.Parse(lokalnaIP), 50036));   // Adresa u lokalnoj mreži
+
+        // 4. Polling model - Liste za utičnice, tajmaute i pokušaje
+        List<Socket> uticnice = new List<Socket> { s1, s2, s3 };
+        // Tajmauti u mikrosekundama (sekunda * 1.000.000)
+        List<int> tajmauti = new List<int> { 500000, 1000000, 1500000 };
+        List<int> pokusaji = new List<int> { 20, 15, 10 };
+
+        Console.WriteLine($"Server pokrenut. Socket3 na IP: {lokalnaIP}");
+
+        while (true)
+        {
+            bool biloDostupno = false;
+
+            for (int i = 0; i < uticnice.Count; i++)
+            {
+                if (pokusaji[i] > 0)
+                {
+                    // Metoda Poll iz PDF-a (proverava ima li podataka za čitanje)
+                    if (uticnice[i].Poll(tajmauti[i], SelectMode.SelectRead))
+                    {
+                        byte[] buffer = new byte[1024];
+                        EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+                        int primljeno = uticnice[i].ReceiveFrom(buffer, ref remoteEP);
+
+                        string poruka = Encoding.UTF8.GetString(buffer, 0, primljeno);
+                        Console.WriteLine($"Socket{i + 1} primio: {poruka} od {remoteEP}");
+                       
+                        biloDostupno = true;
+                        // Ovdje možeš resetovati broj pokušaja ako želiš da nastavi slušati beskonačno
+                    }
+                    else
+                    {
+                        pokusaji[i]--;
+                        Console.WriteLine($"Socket{i + 1} tajmaut. Preostalo pokušaja: {pokusaji[i]}");
+                    }
+                }
+            }
+
+            // Provjera da li su svi soketi potrošili pokušaje
+            if (pokusaji[0] == 0 && pokusaji[1] == 0 && pokusaji[2] == 0)
+            {
+                Console.WriteLine("Svi pokušaji potrošeni. Kraj.");
+                break;
+            }
+        }
+    }
+}
+
+//CLIENT
+
+using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+namespace KlijentProjekat
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            // 1. Kreiranje UDP utičnice (Dgram)
+            Socket klijentSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+            // 2. Podešavanje adrese servera
+            // Za testiranje na istom kompjuteru koristi "127.0.0.1"
+            // Promeni port na 50032, 50034 ili 50036 da proveriš svaki socket na serveru
+            Console.Write("Unesite port servera (50032, 50034 ili 50036): ");
+            int port = int.Parse(Console.ReadLine());
+           
+            IPEndPoint serverEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), port);
+
+            try
+            {
+                Console.WriteLine($"Slanje poruke na port {port}...");
+
+                // 3. Slanje poruke (Pretvaranje teksta u bajtove pomoću Encoding-a iz PDF-a)
+                string tekst = "Zdravo, ovo je test poruka!";
+                byte[] podaci = Encoding.UTF8.GetBytes(tekst);
+
+                // UDP koristi SendTo
+                klijentSocket.SendTo(podaci, serverEP);
+                Console.WriteLine("Poruka je poslata uspešno.");
+
+                // 4. Opciono: Prijem odgovora (ako server šalje ACK)
+                // Postavljamo tajmaut da klijent ne čeka večno ako server ne odgovori
+                klijentSocket.ReceiveTimeout = 2000;
+                byte[] buffer = new byte[1024];
+                EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+
+                int primljeno = klijentSocket.ReceiveFrom(buffer, ref remoteEP);
+                string odgovor = Encoding.UTF8.GetString(buffer, 0, primljeno);
+                Console.WriteLine("Server odgovorio: " + odgovor);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Greška ili tajmaut: " + ex.Message);
+            }
+            finally
+            {
+                klijentSocket.Close();
+                Console.WriteLine("Klijent zatvoren. Pritisnite bilo koji taster...");
+                Console.ReadKey();
+            }
+        }
+    }
+}
+
+
+
